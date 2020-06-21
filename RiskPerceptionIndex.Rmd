@@ -1,0 +1,240 @@
+---
+title: "Replication of a Longitudinal Study: Risk Perception during the 2008 Economic Downturn"
+author: "Jazmia Henry"
+date: "June 17, 2020"
+output: pdf_document
+---
+            
+# Introduction                      
+In October 2008, a mere month before the 2008 Presidential Election, the unthinkable happened. The US Stock Market plunged to historical lows leaving Americans unsure about their future economic prospects. This economic downturn has become a significant event in modern American history- so significant, in fact, that many economists comment about the economic atmosphere using the designation "Pre" and "Post" the 2008 recession.                 
+Realizing the significance of the time, researchers William Burns, Ellen Peters, and Paul Slovic began a longitudinal study on the attitudes of the American electorate. By employing eight separate surveys- referred to as "waves" in the paper- Burns et al were able to identify who changed their perceptions of the US economy and why.               
+Influenced by this seminal work, I use their data to see if the researcher's conclusions hold- did the economic downturn truly change the perceived risk of an individual to lose their investment, jobs, savings, and ability to retire in the year? Do women truly perceive more risk during the economic downturn than men? How do different races compare? Is Income a significant negative predictor of perceived risk in the aftermath of the economic downturn?      
+```{r data_methodology, results=FALSE, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, warning=FALSE)
+rm(list=ls())
+load("RiskIndex.rda")
+RI<-da36341.0001
+RI.ts<-as.ts(RI)
+library(tidyverse)
+library(car)
+library(sandwich)
+library(plm)
+library(dynlm)
+library(nlme)
+library(lmtest)
+library(stargazer)
+Obama1<-as.numeric(RI$TRUSTOBAMA1)
+CONGRESS1<-as.numeric(RI$TRUSTCONGRESS1)
+CEO1<-as.numeric(RI$TRUSTCEO1)
+Obama3<-as.numeric(RI$TRUSTOBAMA3)
+CONGRESS3<-as.numeric(RI$TRUSTCONGRESS3)
+CEO3<-as.numeric(RI$TRUSTCEO3)
+Obama5<-as.numeric(RI$TRUSTOBAMA5)
+CONGRESS5<-as.numeric(RI$TRUSTCONGRESS5)
+CEO5<-as.numeric(RI$TRUSTCEO5)
+Obama7<-as.numeric(RI$TRUSTOBAMA7)
+CONGRESS7<-as.numeric(RI$TRUSTCONGRESS7)
+CEO7<-as.numeric(RI$TRUSTCEO7)
+Race<-as.factor(RI$RACE)
+Age<-as.numeric(RI$AGE)
+TREAS1<-as.numeric(RI$TRUSTTREAS1)
+Income<-as.numeric(RI$INCOME)
+Party<-as.factor(RI$AFFILIATION)
+Educ<-as.factor(RI$EDUCATION)
+```
+   
+# Theory            
+In the Burns et al paper, the researchers examine the factors that may contribute to or temper individual's ratings on the "Risk Perception Index" after the initial stock market crash in October of 2008. Due to the influence of this paper, I will use the Risk Perception Index as an outcome variable as well within my model. The difference is that I will be emphasizing "Race" as an important factor instead of "Education". In Burns et al's paper, while education was predicted to be an important factor, the researchers found that it was not very significant. Therefore, I will test the hypothesis that Race is a statistically significant predictor of ill feelings about the status of the economy and inclination to take on market risk. As well, I look at Trust in CEOs as an important intervening factor in one's Risk Perception Index scores instead of their trust in the Treasury. The reason is a similar one to the reason I had for dropping education as an important predictor- the researchers did not find an important relationship with the two. Furthermore, the wording of the CEO and Treasury trust survey questions, as well as the general atmosphere of movements such as Occupy Wall Street, I believe that distrust in the Treasury Department is directly caused by distrust in CEOs and vice versa. When running the granger tests, however, my results are pretty null. There is no evidence that rises to the level of statistical significance to conclude that there is causal relationship between the two variables in either direction. 
+```{r Granger Test: TREAS/CEO, results=FALSE, echo=FALSE}
+grangertest(CEO1,TREAS1)
+grangertest(TREAS1, CEO1)
+```
+Other than this, all of the other predictive covariates in Burns et al's model are used as predictive covariates in my model. As well, their predictive variable, "Negative Emotion Index", is used as a predictive model in my paper.
+           
+I am going to test three hypotheses:      
+\begin{itemize}         
+\item 1. While Burns et al conclude that Gender is the most important covariate in their model, Race may be an important covariate as well. This is a two-tailed hypothesis-I am not concerned with the direction that the relationship between Race and one's Risk Perception Index score, just that there is a correlation between the two.             
+\item 2. Because I am using Race instead of Education as a predictive covariate, I predict that Income will be a stronger predictor in my model than in Burns' model.            
+\item 3. Like Burns et al, I predict that respondents will be less sensitive to the economic downturn overall in the seventh wave than they were in the first wave meaning that the covariates in my model will have stronger predictive value due to the decrease in "noise" brought on by universal economic insecurity in Wave 1.         
+\end{itemize}        
+                
+## Data/Methodology                    
+My data is replicated data that I downloaded from the ICPSR site. Burns et al's survey started with 800 respondents in the first wave of questions and ended with 400 respondents. These are all the same respondents being asked the same questions across multiple waves taking place in the year following the 2008 stock market crash. The high amount of attrition in the study is noted as a possible confounder in my analysis. As well, I assume that the traditional assumptions of excludability and non-interference are satisfied within this survey, though arguments maybe made for the contrary.                      
+Using what I have available to me, I use the same measure of Risk Perception Index as Burns et al. The Risk Perception Index is a variable made up of the mean scores of respondents from four separate measures: Risk_Job, Risk_Investment, Risk_Savings, Risk_Retire. Each of these measures runs on a 1-5 scale from very low risk to high risk of the respondent losing their job, investments, savings, or ability to retire comfortably due to the economic downturn. I use their Negative Emotion Index measure as a predictive variable, as does Burns et al. The Negative Emotion Index, designated "FinEmotIndex" within the model, is the mean score of multiple negative emotions associated with respondents' financial situations as a result of the economic downturn on an ascending scale from 1 to 4: sadness, anger, anxiety, fear, worry, and stress. The other predictive variables are measures of trust of CEOs, President Obama, and Congress from an ascending scale of 1 through 5.               
+The covariates within the model are self- reported measures of 'Race, 'Income, 'Gender, and Lipkus scores. Lipkus scores are a test of numeric and probabilistic ability created by researchers Lipkus, Samsa, and Rimer used in the original Burns et al model (also referred to as numeracy scores). The higher a respondent's numeracy score, the better the respondent has performed on the numeracy test. I find this to be a more reliable measure of individual ability for the sake of this model than education due to two things: 1. As previously mentioned, education has very little predictive value, but Lipkus scores do, and 2. Research shows that those who have Lipkus scores process information differently than those who have low scores in ways that have serious real world effects. (Lipkus, Samsa, and Rimer)             
+              
+# Results                     
+My model begins as a dynamic linear regression model of my data, RI (stands for Risk Index). I regress four waves of Burns et al survey in my analysis. Wave 1 takes place from Sept 29 - Oct 1, 2008, the days after the Dow dropped 778 points, with a N of 802 respondents. Wave 3 is in the days after the election of President Obama on Nov 5-7, 2008 with a N of 755 respondents. Wave 5 is collected the week of March 21-26, 2009, two weeks after the Dow rose by 33%, with a N of 605 respondents. Lastly, wave 7 takes place on Oct 3-9, 2009 with a N of 645 respondents, one year after the original survey. Becuase of the relative importance of the dates before and during these waves, I only look at these four waves in my analysis, deciding to not test the other four waves in the Burns et al model.                    
+In my first regression analysis, J1, I come to the same conclusion as Burns et al, negative emotions about the financial crisis and Lipkus scores are the most salient predictors of a change in Risk Perception Index scores (will be referred to as RPI scores from now on). Unlike Burns et al's assesment (and in line with my hypothesis), Income is shown to be a strong predictor of RPI scores. As speculated earlier, I feel this is due to my decision to take education out of the analysis as a predictor. FinEmotIndex (negative emotions) is strongly positively correlated with an increase in higher RPI scores. This means, substantively, that respondents that have stronger negative emotions about their finances are more likely to believe they are at risk of losing their investment, job, savings, and ability to retire. The question is whether this relationship is tautological or causally linked. I am leaning toward this being a tautological relationship, but for the sake of analysis. Those with higher Lipkus scores are no more likely to have lower RPI scores. Those with higher income also do not have a statistically significant relationship with lower RPI scores. There can be a few reasons for this, all of which are purely speculative and without empirical evidence: 1. Those with higher Income feel qually insecure about the economic market because the 2008 downtown affected groups across America across industries and socio-economic class. The perceived ability to rebound more quickly from economic setbacksmore likely came much later in the business cycle and 2. While people with higher Lipkus scores are better with numerics and therefore more likely to see things more objectively than their more emotional peers, the 2008 economic downtown was objectively bad leading to a general sense of malaise regardless of the identity, wealth, and numeric ability of the people in the longitudinal  study.          
+
+```{r CONFIDENCE Measure, results=FALSE, echo=FALSE}
+j1<-dynlm(RISKPERCEPTIONINDEX1~FINEMOTINDEX1+LIPKUS11+Race+GENDER+Income+CEO1+CONGRESS1+Obama1, data=RI)
+summary(j1)
+j2<-dynlm(RISKPERCEPTIONINDEX3~FINEMOTINDEX3+LIPKUS11+Race+GENDER+Income+CEO3+CONGRESS3+Obama3, data=RI)
+summary(j2)
+j3<-dynlm(RISKPERCEPTIONINDEX5~FINEMOTINDEX5+LIPKUS11+Race+GENDER+Income+CEO5+CONGRESS5+Obama5, data=RI)
+summary(j3)
+j4<-dynlm(RISKPERCEPTIONINDEX7~FINEMOTINDEX7+LIPKUS11+Race+GENDER+Income+CEO7+CONGRESS7+Obama7, data=RI)
+summary(j4)
+```
+My next two regression models are more of the same, Lipkus scores, negative emotions about finances, and income are not major predictors of RPI scores. Consequently, generalized economic uncertainty is the only strong predictor and two  subsets of race (Native Americans and Hispanics) are significant predictors of low RPI scores. Due to the similar coding and wording of RPI and FinEmotIndex questions, I run a Granger Causality test on the two variables and find that not only does each variable cause the other, there is a very large p value leading me to believe that the relationship between economic uncertainty and low propensity to take on market risk is tautological. Due to this, I drop FinEmotIndex scores from my analysis in future regression models to see how the covaraites and predictive variables hold up without FinEmotIndex minimizing their significance.
+          
+```{r Granger Causality, results=FALSE, echo=FALSE}
+j.dynlm1<-dynlm(RISKPERCEPTIONINDEX1~FINEMOTINDEX1, data=RI)
+summary(j.dynlm1)
+j.dynlm2<-dynlm(FINEMOTINDEX1~RISKPERCEPTIONINDEX1, data=RI)
+summary(j.dynlm2)
+grangertest(RI$RISKPERCEPTIONINDEX1, RI$FINEMOTINDEX1)
+grangertest(RI$RISKPERCEPTIONINDEX3, RI$FINEMOTINDEX3)
+grangertest(RI$RISKPERCEPTIONINDEX5, RI$FINEMOTINDEX5)
+grangertest(RI$RISKPERCEPTIONINDEX7, RI$FINEMOTINDEX7)
+grangertest(RI$FINEMOTINDEX1, RI$RISKPERCEPTIONINDEX1)
+grangertest(RI$FINEMOTINDEX3, RI$RISKPERCEPTIONINDEX3)
+grangertest(RI$FINEMOTINDEX5, RI$RISKPERCEPTIONINDEX5)
+grangertest(RI$FINEMOTINDEX7, RI$RISKPERCEPTIONINDEX7)
+```
+                
+## Model without FinEmotIndex scores                         
+Now, my regression analysis shows gender to be the strongest predictor of RPI scores, much like Burns et al. Gender is a strong negative predictor (Male=1), meaning that men are likely to have significantly lower RPI scores than women. As well, Lipkus scores are statistically significant at predicting RPI scores. Newly statistically significant predictive variables are Trust in CEOs and Trust in Congress. This agrees Burns et al's analysis, on the one hand, which proves that Trust in Congress mitigates one's perception that they risk losing their jobs, investments, savings, and ability to retire. On the other hand, I find that Trust in CEOs is also an important predictor, just not as strong as Trust in Congress. As I previously predicted, the variance in my model is greatly reduced when I take the FinEmotIndex scores out of the model. If the desire of my analysis were to increase variance and have variables in my model that bring a lot of stars, then excluding FinEmotIndex scores would be foolish, but alas, I leave it to the reader to decide for themselves if the integrity of the model is beholden to the amount of variance in the model. I am more inclined to believe that the model is stronger without the FinEmotIndex scores because it is more honest. The economic downturn of 2008 affected everyone, and while some groups perceived more risk than others, nonetheless we all were affected by its effects. This may help explain why race, a predictor I thought would have large statistical predictive value, did not have much predictive value when general economic uncertainty is controlled for in further analysis.         
+My other three regression models tell interesting stories: in the the days following Obama's 2008 election, Lipkus scores are the only statistically significant predictor of RPI scores and the relationship, as in all of my models, is negative. Gender is marginally negatively correlated with RPI scores, and the rest of the covariates and predictive variables are not correlative. The variable that measures Trust in Obama is particularly interesting with a whopping .29 p value. This makes me conclude that repsondents either trusted Obama or not regardless of their RPI scores. Considering that President Obama won by 7% points and over 10 million votes, I feel that this theory holds: people just like Obama in general and it as little to do with what they saw as a risk to their jobs, investments, savings, or ability to retire. It is not until Wave 7, one year after the economic downturn, that Trust in Obama become a statistically significant predictor of one's RPI scores. This is not enough to reject theories that Obama won because of the economic downturn, but it is enough to question the validity of the assertion.                        
+          
+```{r DYNLM results, results=FALSE, echo=FALSE}
+knitr::opts_chunk$set(echo = FALSE, warning=FALSE)
+j5<-dynlm(RISKPERCEPTIONINDEX1~Race+LIPKUS11+GENDER+Income+CEO1+CONGRESS1+Obama1, data=RI.ts)
+summary(j5)
+j6<-dynlm(RISKPERCEPTIONINDEX3~Race+LIPKUS11+GENDER+Income+CEO5+CONGRESS3+Obama3, data=RI.ts)
+summary(j6)
+j7<-dynlm(RISKPERCEPTIONINDEX5~Race+LIPKUS11+GENDER+Income+CEO5+CONGRESS5+Obama5, data=RI.ts)
+summary(j7)
+j8<-dynlm(RISKPERCEPTIONINDEX7~Race+LIPKUS11+GENDER+Income+CEO7+CONGRESS7+Obama7, data=RI.ts)
+summary(j8)
+```
+         
+## Comparison with OLS             
+I conclude by comparing my dynamic linear regression models with ordinary least squares regression output. I did so to see if there was any difference in the results. When FinEmotIndex scores are taken out of the model, there is no difference between the OLS results and the DYNLM results. *See .RMD file for all OLS results.*      
+```{r OLS, results=FALSE, echo=FALSE}
+knitr::opts_chunk$set(echo = FALSE, warning=FALSE)
+summary(j.ols1<-lm(RISKPERCEPTIONINDEX1~Race+LIPKUS11+GENDER+Income+CEO1+CONGRESS1+Obama1, data=RI))
+summary(j.ols2<-lm(RISKPERCEPTIONINDEX1~Race+LIPKUS11+GENDER+Income+CEO3+CONGRESS3+Obama3, data=RI))
+summary(j.ols3<-lm(RISKPERCEPTIONINDEX5~Race+LIPKUS11+GENDER+Income+CEO5+CONGRESS5+Obama5, data=RI))
+summary(j.ols4<-lm(RISKPERCEPTIONINDEX7~Race+LIPKUS11+GENDER+Income+CEO7+CONGRESS7+Obama7, data=RI))
+```
+```{r OLS vs. DYNLM, results=TRUE, echo=FALSE}
+knitr::opts_chunk$set(fig.height = 9, fig.width = 7, echo = FALSE, warning=FALSE)
+stargazer(j1,j5,j.ols1, type= "text")
+stargazer(j2,j6,j.ols2, type= "text")
+stargazer(j3,j7,j.ols3, type= "text")
+stargazer(j4,j8,j.ols4, type= "text")
+```
+               
+# Conclusion       
+I find much of Burns et al's analysis to be true, though I disagree with some of their methods, but that is mostly a question of design. I was able to find their conclusion that gender and Lipkus scores are an important predictor of RPI scores to be true. I did not find Race to be an important predictor as I orginally hypothesized. I was correct in my assessment that the covariates would be stronger predictors, overall, in the seventh wave than in the first.       
+While plotting a few of the covariates on RPI scores- Race, Income, and Gender (as done in the paper)- I see that Race may have lost its predictive value because of Native American respondents which prove to be extreme outliers in the study (*plot shown in the Appendix). In future analysis, it would be beneficial to run a panel regression model with these predictors. Due to the nature of the dataset (variables coded as factor variables as opposed to numeric variables) and my ignorance on how to run a PLM on factor variables, I was unable to do this. Also, if there is a way to convert the "WAVE" variables into their time correspondents, then that would allow to better comparative analysis between waves as well as comparative plotting.    
+            
+# *References*          
+\begin{itemize}
+\item Burns, William, et al. Risk Perception and the Economic Crisis: A Longitudinal Study of the Trajectory of Perceived Risk. Risk Analysis, Vol. 32, 2012, pp. 659-677, Risk Perception and the Economic Crisis: A Longitudinal Study of the Trajectory of Perceived Risk.          
+\item Lipkus, Isaac, et al. General Performance on a Numeracy Scale among Highly Educated Samples. Medical Decision Making, 2001, pp. 37-44, General Performance on a Numeracy Scale among Highly Educated Samples.        
+\end{itemize}
+            
+# Appendix    
+         
+## Wave 1 Plots           
+```{r RPI by Gender Wave 1, echo=FALSE}
+knitr::opts_chunk$set(fig.height = 9, fig.width = 7, echo = FALSE, warning=FALSE)
+plot(RI$GENDER, RI$RISKPERCEPTIONINDEX1, xlab= "Gender", 
+     ylab="RPI scores 1", main= "RPI Scores by Gender Wave 1", 
+     pch = 19, frame = FALSE)
+abline(lm(RI$RISKPERCEPTIONINDEX1 ~ RI$GENDER, data = RI), col = "red")
+```
+
+```{r RPI by Race Wave 1, echo=FALSE}
+knitr::opts_chunk$set(fig.height = 9, fig.width = 7, echo = FALSE, warning=FALSE)
+plot(RI$RACE, RI$RISKPERCEPTIONINDEX1, type="n", xlab= "Race", ylab="RPI scores 1", main= "RPI Scores by Race Wave 1") 
+text(RI$RACE, RI$RISKPERCEPTIONINDEX1, labels = names(RI$RACE), cex=0.7)
+abline(lm(RI$RISKPERCEPTIONINDEX1 ~ RI$RACE), lwd=2, col="red")
+```
+
+```{r RPI by Income Wave 1, echo=FALSE}
+knitr::opts_chunk$set(fig.height = 9, fig.width = 7, echo = FALSE, warning=FALSE)
+plot(RI$INCOME, RI$RISKPERCEPTIONINDEX1, type="n", xlab= "Income", ylab="RPI scores 1", main= "RPI Scores by Income Wave 1") 
+text(RI$INCOME, RI$RISKPERCEPTIONINDEX1, labels = names(RI$INCOME), cex=0.7)
+abline(lm(RI$RISKPERCEPTIONINDEX1 ~ RI$INCOME), lwd=2, col="red")
+```
+      
+## Wave 3 plots              
+```{r RPI by Gender Wave 3, echo=FALSE}
+knitr::opts_chunk$set(fig.height = 9, fig.width = 7, echo = FALSE, warning=FALSE)
+plot(RI$GENDER, RI$RISKPERCEPTIONINDEX3, type="n", xlab= "Gender", 
+     ylab="RPI scores 3", main= "RPI Scores by Gender Wave 3")
+text(RI$GENDER, RI$RISKPERCEPTIONINDEX3, cex=0.7)
+abline(lm(RI$RISKPERCEPTIONINDEX3 ~ RI$GENDER), lwd=2, col="red")
+```
+
+
+```{r RPI by Race Wave 3, echo=FALSE}
+knitr::opts_chunk$set(fig.height = 9, fig.width = 7, echo=FALSE, warning=FALSE)
+plot(RI$RACE, RI$RISKPERCEPTIONINDEX3, type="n", xlab= "Race", 
+     ylab="RPI scores 3", main= "RPI Scores by Race Wave 3")
+text(RI$RACE, RI$RISKPERCEPTIONINDEX3, cex=0.7)
+abline(lm(RI$RISKPERCEPTIONINDEX3 ~ RI$RACE), lwd=2, col="red")
+```
+
+
+```{r RPI by Income Wave 3, echo=FALSE}
+knitr::opts_chunk$set(fig.height = 9, fig.width = 7, echo=FALSE, warning=FALSE)
+plot(RI$INCOME, RI$RISKPERCEPTIONINDEX3, type="n", xlab= "Income", 
+     ylab="RPI scores 3", main= "RPI Scores by Income Wave 3")
+text(RI$INCOME, RI$RISKPERCEPTIONINDEX3, cex=0.7)
+abline(lm(RI$RISKPERCEPTIONINDEX3 ~ RI$INCOME), lwd=2, col="red")
+```
+        
+## Wave 5 plots     
+```{r RPI by Gender Wave 5, echo=FALSE}
+knitr::opts_chunk$set(fig.height = 9, fig.width = 7, echo=FALSE, warning=FALSE)
+plot(RI$GENDER, RI$RISKPERCEPTIONINDEX5, type="n", xlab= "Gender", 
+     ylab="RPI scores 5", main= "RPI Scores by Gender Wave 5")
+text(RI$GENDER, RI$RISKPERCEPTIONINDEX5, cex=0.7)
+abline(lm(RI$RISKPERCEPTIONINDEX5 ~ RI$GENDER), lwd=2, col="red")
+```
+
+
+```{r RPI by Race Wave 5, echo=FALSE}
+knitr::opts_chunk$set(fig.height = 9, fig.width = 7, echo=FALSE, warning=FALSE)
+plot(RI$RACE, RI$RISKPERCEPTIONINDEX5, type="n", xlab= "Race", 
+     ylab="RPI scores 5", main= "RPI Scores by Race Wave 5")
+text(RI$RACE, RI$RISKPERCEPTIONINDEX5, cex=0.7)
+abline(lm(RI$RISKPERCEPTIONINDEX5 ~ RI$RACE), lwd=2, col="red")
+```
+
+
+```{r RPI by Income Wave 5, echo=FALSE}
+knitr::opts_chunk$set(fig.height = 9, fig.width = 7, echo=FALSE, warning=FALSE)
+plot(RI$INCOME, RI$RISKPERCEPTIONINDEX5, type="n", xlab= "Income", 
+     ylab="RPI scores 5", main= "RPI Scores by Income Wave 5")
+text(RI$INCOME, RI$RISKPERCEPTIONINDEX5, cex=0.7)
+abline(lm(RI$RISKPERCEPTIONINDEX5 ~ RI$INCOME), lwd=2, col="red")
+```
+
+## Wave 7 Plots
+```{r RPI by Gender Wave 7, echo=FALSE}
+knitr::opts_chunk$set(fig.height = 9, fig.width = 7, echo = FALSE, warning=FALSE)
+plot(RI$GENDER, RI$RISKPERCEPTIONINDEX7, type="n", xlab= "Gender", ylab="RPI scores 7", main= "RPI Scores by Gender Wave 7") 
+text(RI$GENDER, RI$RISKPERCEPTIONINDEX7, labels = names(RI$Gender), cex=0.7)
+abline(lm(RI$RISKPERCEPTIONINDEX7 ~ RI$GENDER), lwd=2, col="red")
+```
+
+```{r RPI by Race Wave 7, echo=FALSE}
+knitr::opts_chunk$set(fig.height = 9, fig.width = 7, echo = FALSE, warning=FALSE)
+plot(RI$RACE, RI$RISKPERCEPTIONINDEX7, type="n", xlab= "Race", ylab="RPI scores 7", main= "RPI Scores by Race Wave 7") 
+text(RI$RACE, RI$RISKPERCEPTIONINDEX7, labels = names(RI$RACE), cex=0.7)
+abline(lm(RI$RISKPERCEPTIONINDEX7 ~ RI$RACE), lwd=2, col="red")
+```
+
+```{r RPI by Income Wave 7, echo=FALSE}
+knitr::opts_chunk$set(fig.height = 9, fig.width = 7, echo = FALSE, warning=FALSE)
+plot(RI$INCOME, RI$RISKPERCEPTIONINDEX7, type= "n", xlab= "Income", ylab="RPI scores 7", main= "RPI Scores by Income Wave 7") 
+text(RI$INCOME, RI$RISKPERCEPTIONINDEX7, labels = names(RI$INCOME), cex=0.7)
+abline(lm(RI$RISKPERCEPTIONINDEX7 ~ RI$INCOME), lwd=2, col="red")
+```
+   
